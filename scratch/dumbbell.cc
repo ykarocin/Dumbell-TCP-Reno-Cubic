@@ -8,9 +8,7 @@
 
 using namespace ns3;
 
-// ==========================================
-// VARIÁVEIS GLOBAIS E FUNÇÕES PARA RASTREIO (TRACING)
-// ==========================================
+// Variáveis globais e funcões para rastreio
 std::ofstream cwndStream;
 std::ofstream throughputStream;
 uint32_t prevRxBytes = 0;
@@ -42,21 +40,16 @@ void CalculateThroughput(Ptr<PacketSink> sink) {
     Simulator::Schedule(Seconds(0.5), &CalculateThroughput, sink);
 }
 
-// ==========================================
-// FUNÇÃO PRINCIPAL
-// ==========================================
 int main() {
     Time::SetResolution(Time::NS);
 
-   // 🔥 DEFINIR A VARIANTE DO TCP AQUI 🔥
-    // Para a primeira parte do exercício, usamos o TcpNewReno (que é o Reno do ns-3):
-    Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TypeId::LookupByName("ns3::TcpNewReno")));
+    // TCP Reno
+    // Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TypeId::LookupByName("ns3::TcpNewReno")));
 
-    // Para a segunda parte, comente a linha acima e descomente a linha abaixo:
-    // Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
-    // ======================
-    // NÓS
-    // ======================
+    // TCP Cubic
+    Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
+
+    // Nós
     NodeContainer leftNodes;
     leftNodes.Create(2); // S1 (UDP), S2 (TCP)
 
@@ -66,9 +59,6 @@ int main() {
     NodeContainer routers;
     routers.Create(2); // R1, R2
 
-    // ======================
-    // LIGAÇÕES (LINKS)
-    // ======================
     // Ligações de Acesso: 10Mbps, 40ms de atraso
     PointToPointHelper p2p;
     p2p.SetDeviceAttribute("DataRate", StringValue("10Mbps"));
@@ -90,17 +80,13 @@ int main() {
     // R2 -> D2
     NetDeviceContainer d5 = p2p.Install(routers.Get(1), rightNodes.Get(1));
 
-    // ======================
-    // INTERNET
-    // ======================
+    // Internet
     InternetStackHelper stack;
     stack.Install(leftNodes);
     stack.Install(rightNodes);
     stack.Install(routers);
 
-    // ======================
-    // ENDEREÇOS IP
-    // ======================
+    // Endereços ip
     Ipv4AddressHelper address;
 
     address.SetBase("10.0.1.0", "255.255.255.0");
@@ -120,9 +106,7 @@ int main() {
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    // ======================
-    // 🔥 TRÁFEGO UDP DE FUNDO (S1 -> D1)
-    // ======================
+    //Tráfego UDP de fundo (S1 -> D1)
     uint16_t udpPort = 4000;
 
     OnOffHelper udpApp("ns3::UdpSocketFactory", InetSocketAddress(i4.GetAddress(1), udpPort));
@@ -140,9 +124,7 @@ int main() {
     udpReceiver.Start(Seconds(1.0));
     udpReceiver.Stop(Seconds(10.0));
 
-    // ======================
-    // 🔥 TRÁFEGO TCP RENO (S2 -> D2)
-    // ======================
+    // Tráfego TCP (S2 -> D2)
     uint16_t tcpPort = 5000;
 
     PacketSinkHelper tcpSink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), tcpPort));
@@ -161,14 +143,11 @@ int main() {
     tcpSender.Start(Seconds(1.0));
     tcpSender.Stop(Seconds(10.0));
 
-    // ======================
-    // PREPARAÇÃO DOS FICHEIROS DE SAÍDA E EVENTOS DE TRACING
-    // ======================
-    // Nota: Quando for simular o TCP Cubic, altere os nomes dos ficheiros abaixo
-    cwndStream.open("cwnd_reno.dat");
-    throughputStream.open("throughput_reno.dat");
+    // Mapeando saída
+    cwndStream.open("cwnd_cubic.dat");
+    throughputStream.open("throughput_cubic.dat");
 
-    // Agenda o início da recolha da janela de congestionamento (logo após a aplicação iniciar)
+    // Agenda o início da recolha da janela de congestionamento
     Simulator::Schedule(Seconds(1.00001), &TraceCwnd);
     
     // Obtém o ponteiro do destino TCP para medir os pacotes que chegam
@@ -176,9 +155,7 @@ int main() {
     // Agenda a primeira medição de débito para o segundo 1.5
     Simulator::Schedule(Seconds(1.5), &CalculateThroughput, tcpSinkPtr);
 
-    // ======================
-    // SIMULAÇÃO E FLOWMONITOR
-    // ======================
+    // Simulação
     Simulator::Stop(Seconds(10.0));
     FlowMonitorHelper flowHelper;
     Ptr<FlowMonitor> monitor = flowHelper.InstallAll();
@@ -189,9 +166,6 @@ int main() {
     cwndStream.close();
     throughputStream.close();
 
-    // ======================
-    // ESTATÍSTICAS FINAIS
-    // ======================
     monitor->CheckForLostPackets();
 
     Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowHelper.GetClassifier());
